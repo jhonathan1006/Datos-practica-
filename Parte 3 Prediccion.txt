@@ -1,0 +1,300 @@
+# Librerías a cargar para el ejercicio.
+library(sf)
+library(raster)
+library(ggplot2)
+library(rgdal)
+library(RStoolbox)
+
+############################################################
+# Importamos las bandas a la plataforma RStudio.
+
+setwd("D:/A_manuscrito/Para ponencia/Datos")
+
+files <- list.files(pattern='.sdat')
+files
+
+b1 <- raster("D:/A_manuscrito/Para ponencia/Datos/Band 1.sdat")
+b2 <- raster("D:/A_manuscrito/Para ponencia/Datos/Band 2.sdat")
+b3 <- raster("D:/A_manuscrito/Para ponencia/Datos/Band 3.sdat")
+b4 <- raster("D:/A_manuscrito/Para ponencia/Datos/Band 4.sdat")
+
+# Características de los datos de las bandas multiespectrales,  con de tamaño de pixel 8 metros.
+
+b1
+
+# Conversión de nivel digital a radiancia. Ver articulo  https://doi.org/10.1016/j.rse.2018.09.017
+
+rad <- function(x1,x2,x3,x4){ 
+  rb1 <- 1.68*x1+(0)
+  rb2 <- 1.62*x2+(0)
+  rb3 <- 1.59*x3+(0)
+  rb4 <- 1.24*x4+(0)
+  return(list(rb1,rb2,rb3,rb4))
+}
+rabs<- stack(rad(b1,b2,b3,b4))
+
+
+# Cálculo de distancia sol a la tierra, en unidades astronómicas.
+
+dist<- function(j=228){
+  da <- (1-0.01672*cos(0.9856*(j-4)*(pi/180)))
+  return(da)}# Ingresamos el valor del día juliano, en este caso es día 228.
+d<-dist()
+d
+
+
+# Cálculo de ángulo cenital.
+
+ac <- function(t=58.4011){
+  a <- cos((pi/180)*(90-t))
+  return(a)
+}
+z<- ac()
+z
+
+
+#  Cálculo del valor de reflectancia. 
+# Para determinar los valores de Esun, consultamos la siguiente url: https://doi.org/10.1016/j.rse.2018.09.017
+ref <- function(){
+  rf1<- ((pi)*rabs$Band_1*d^2)/(1958*z)
+  rf2<- ((pi)*rabs$Band_2*d^2)/(1852*z)
+  rf3<- ((pi)*rabs$Band_3*d^2)/(1559*z)
+  rf4<- ((pi)*rabs$Band_4*d^2)/(1091*z)
+  
+  return(list(rf1,rf2,rf3,rf4))
+}
+
+rfbs<-stack(ref())
+rfbs
+
+hist(rfbs$Band_1)
+# generando el proceso de rescalamineto 
+res <- function(){
+  res1<-((rfbs$Band_1-0.2791054)/(3.320057-0.2791054))
+  res2<-((rfbs$Band_2-0.2051346)/(3.384721-0.2051346))
+  res3<-((rfbs$Band_3-0.2044561)/(3.946389-0.2044561))
+  res4<-((rfbs$Band_4-0.2106523)/(4.397905-0.2106523))
+  
+  return(list(res1,res2,res3,res4))
+}
+
+resc<-stack(res())
+resc
+
+
+# Explorando los datos preprocesados 
+# Activamos las siguientes librerias previamente:
+
+library(ggplot2)
+library(RStoolbox)
+
+summary(resc$Band_1)
+
+hist(resc$Band_4)
+
+plot(resc$Band_2)
+
+# Aplicamos el siguiente código para mostrar la combinación de bandas. 
+
+ggRGB(resc,r=3,g=2,b=1,stretch = "lin") + ggtitle("Combinación bandas 321") 
+
+
+
+# Clasificación de cobertura mediante la técnica de Machine Leaening, adapatado del código 
+# públicado por Kwesie Benjamin, (2021); https://www.rpubs.com/BenKwesie/792661 
+
+# Activamos las siguientes librerias: 
+
+library(dplyr)
+library(raster)
+library(tmap)
+library(caret)
+
+# Se importan las ubicaciones de los objetos conocido, en formato vectorial de tipo polígono. 
+
+files <- list.files(pattern='.shp')
+files
+
+roiTraining <- sf::read_sf("D:/A_manuscrito/Para ponencia/Datos/Muestra.shp") 
+
+roiTraining
+
+plot(roiTraining)
+
+# Identificamos los contenidos de la tabla de atributos de dato vectorial. 
+
+roiTraining$Cobertura <- as.factor(roiTraining$Cobertura)
+
+# Seleccionamos los atributos  de los tipo de cobertura, zona de entrenamiento. 
+
+unique(roiTraining$Cobertura)
+
+# Previamente, los datos espaciales del dato raster y del dato vectorial debe estar en el 
+# mismo sistema de referencia espacial. 
+
+crs(roiTraining)
+crs(resc)
+
+# Se extrae los valores de los pixeles de los datos raster que corresponde a la zona de entrenamiento. 
+
+extract <- raster::extract(resc,roiTraining,df=TRUE)
+
+head(extract)
+
+# Se genera el jion entre los coordenads de los puntos de entrenamiento con las coordenadas 
+# de los pixeles del dato raster, con (ID y id), para obtener una data frame con valores conjuntas. 
+
+extractMerged <- dplyr::inner_join(extract,roiTraining,by= c("ID"="id")) 
+
+extractMerged
+
+# Suprimimos los valores que tienen datos nulos.
+
+extractMerged$geometry <- NULL
+
+# Dividimos el data data frame, en proprorciones  de 70% y 30% para aplicar los procesos de entrenamiento.
+
+
+set.seed(123) 
+trainIndex <- caret::createDataPartition(extractMerged$ID,list = FALSE,p=0.7)
+
+trainData <- extractMerged[trainIndex,]  # 70% for training Data
+testData <- extractMerged[-trainIndex,] # 30% for testing Data
+
+# Visualizamos los datos  de tipos de cobertura en la dataframe de  entrenamiento. 
+
+
+classCount <- trainData %>%
+  dplyr::group_by(Cobertura) %>% 
+  count()
+
+print(classCount)
+
+# Mostrando la proporción de los pixeles de entremaniento.
+
+(prop.table(table(trainData$Cobertura))*100)
+
+# Presentamos el contenido de la data frame del entrenamiento. 
+
+print(head(trainData))
+
+# Se prepara los datos para construir el modelo de entrenamiento de Random forest.
+# Variable de los objetos de la muestra. 
+
+respVar <- c("Cobertura")
+
+# Predicción de variables con los datos de los pixeles del datos raster. 
+
+predVar <- c("Band_1","Band_2","Band_3","Band_4")
+
+# Luego de construir el modelo utilizamos los datos de prueba. 
+
+set.seed(124)
+cvControl <- caret::trainControl(method = 'cv',
+                                 number = 10,
+                                 savePredictions = TRUE,
+                                 verboseIter = FALSE)
+
+# Aplicamos de algoritmo de random forest y avaluamos la exactitud de coeficiente de Kappa.  
+
+library(randomForest)
+
+
+set.seed(124)
+rfModel <- caret::train(trainData[,predVar],
+                        trainData[,respVar],
+                        method="rf",
+                        metric = "Kappa",
+                        ntree= 500,
+                        trControl= cvControl,
+                        tuneLength=6,
+                        importance=TRUE)
+
+# Mostramos el modelo de predicción, aplicando el método de validacion cruzada rfModel.   
+
+print(rfModel)
+
+# Evaluamos el desempeño del modelo utilizando los datos de prueba. 
+
+rfPredict <- predict(rfModel,testData)
+
+# Utilizamos la matriz de confusión, teniendo en cuenta la matriz de Kappa. 
+
+confusionMatrix(rfPredict,testData$Cobertura)
+
+## Selección de características (eliminación de características recursivas).  
+# Intenta eliminar las características no predictoras para mejorar el rendimiento.
+
+set.seed(124)
+indexRfe <- createMultiFolds(trainData$Cobertura, times=5) 
+
+## Se indica una secuencia de cómo queremos que se subdividan las variables predictoras. 
+
+
+predSeq <-seq(from=1, to =length(predVar),by=2)
+
+#Se genera la función de la eliminación de la características recursivas(ECR).
+
+rfeCont <- rfeControl(method="cv",
+                      number = 10,
+                      verbose=FALSE,
+                      functions=rfFuncs,
+                      index=indexRfe)
+
+# Eliminación de la características recursivas   (ntree=500)
+
+#Previamente procesamos nuestros datos de entrenamiento antes
+#de introducirlos en el algoritmo ECR.
+
+set.seed(124)
+rfModelRfe <- caret::rfe(trainData[,predVar],
+                         trainData[,respVar],
+                         sizes = predSeq,
+                         metric = "Kappa",
+                         ntree=500,
+                         method="rf",
+                         rfeControl = rfeCont)
+
+# Mostramos el resultados del modelo, para verificar las variales 
+#con las respectivas exactitudes y valores de corficiente de Kappa.
+
+print(rfModelRfe)
+
+
+# En seguida se evalua con los datos que corresponde al test de datos aplicando el modelo de ECR.
+
+
+rfElemPredict <- predict(rfModelRfe,testData)
+
+rfElemPredict
+
+confusionMatrix(rfElemPredict$pred,testData$Cobertura)
+
+## Aplicamos la predicción espacial utlizando el modelo con los datos de las imagenes.  
+
+bawkuPredictions<- raster::predict(resc,rfModel)
+
+# Mostramos los tipos de objetos
+
+plot(bawkuPredictions)
+
+# Luego elegimos patrones  para asociar los tipos de cobertura
+
+pal <-c('#ffdab9','#fffafa','#6b8e23','#87ceff','#b3ee3a')
+
+# A continuación presentamos el mapa de coberturas. 
+
+tm_shape(bawkuPredictions)+
+  tm_raster(style = "cat",labels = c("Afloramiento roca",
+                                     "Glaciares","Humedales",
+                                     "Lagunas","Otros tipos de cobertura"
+  ),
+  palette = pal,
+  title = "Leyenda")+
+  tm_compass(position = c("left", "top"))+
+  tm_scale_bar(position = c("right", "bottom"))+
+  tm_layout(main.title= "Tipos de cobertura imágenes CBERS 4A",
+            main.title.size =.9 )+
+  tm_layout(legend.outside = TRUE,
+            legend.outside.position = "right",
+            legend.title.size = 1) 

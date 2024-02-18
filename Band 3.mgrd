@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<SAGA_METADATA>
+  <DATABASE></DATABASE>
+  <SOURCE></SOURCE>
+  <HISTORY saga-version="7.8.0">
+    <TOOL library="shapes_grid" id="7" name="Clip Grid with Polygon">
+      <OPTION type="grid_system" id="PARAMETERS_GRID_SYSTEM" name="Grid System">
+        <CELLSIZE>8</CELLSIZE>
+        <XMIN>278566</XMIN>
+        <XMAX>390870</XMAX>
+        <YMIN>8711478</YMIN>
+        <YMAX>8826398</YMAX>
+      </OPTION>
+      <OPTION type="choice" id="EXTENT" name="Target Extent" index="1">polygons</OPTION>
+      <INPUT_LIST type="grid_list" id="INPUT" name="Input" system="PARAMETERS_GRID_SYSTEM">
+        <INPUT type="grid_list" id="INPUT" name="Input" system="PARAMETERS_GRID_SYSTEM"/>
+        <INPUT type="grid_list" id="INPUT" name="Input" system="PARAMETERS_GRID_SYSTEM"/>
+        <INPUT type="grid_list" id="INPUT" name="Input" system="PARAMETERS_GRID_SYSTEM"/>
+        <INPUT type="grid_list" id="INPUT" name="Input" system="PARAMETERS_GRID_SYSTEM"/>
+      </INPUT_LIST>
+      <INPUT type="shapes" id="POLYGONS" name="Polygons">
+        <TOOL library="shapes_tools" id="0" name="Create New Shapes Layer">
+          <OPTION type="text" id="NAME" name="Name">Limite</OPTION>
+          <OPTION type="choice" id="TYPE" name="Shape Type" index="3">Polygon</OPTION>
+          <OPTION type="choice" id="VERTEX" name="Vertex Type" index="0">x, y</OPTION>
+          <OPTION type="integer" id="NFIELDS" name="Number of Attributes">2</OPTION>
+          <parameters name="Attributes" id="FIELDS" type="parameters">
+            <OPTION type="text" id="NAME0" name="Name" parms="FIELDS">ID</OPTION>
+            <OPTION type="choice" id="TYPE0" name="Type" parms="FIELDS" index="3">unsigned 1 byte integer</OPTION>
+            <OPTION type="text" id="NAME1" name="Name" parms="FIELDS">Name</OPTION>
+            <OPTION type="choice" id="TYPE1" name="Type" parms="FIELDS" index="0">string</OPTION>
+          </parameters>
+          <OUTPUT type="data_object" id="SHAPES" name="Shapes">Limite</OUTPUT>
+        </TOOL>
+      </INPUT>
+      <OUTPUT type="grid_list" id="OUTPUT" name="Output">CBERS_4A_WPM_20210817_244_127_L4_BAND3</OUTPUT>
+    </TOOL>
+  </HISTORY>
+  <FILE></FILE>
+  <DESCRIPTION></DESCRIPTION>
+  <PROJECTION>
+    <OGC_WKT>PROJCS["WGS 84 / UTM zone 18S",GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0,AUTHORITY["EPSG","8901"]],UNIT["degree",0.0174532925199433,AUTHORITY["EPSG","9122"]],AUTHORITY["EPSG","4326"]],PROJECTION["Transverse_Mercator"],PARAMETER["latitude_of_origin",0],PARAMETER["central_meridian",-75],PARAMETER["scale_factor",0.9996],PARAMETER["false_easting",500000],PARAMETER["false_northing",10000000],UNIT["metre",1,AUTHORITY["EPSG","9001"]],AXIS["Easting",EAST],AXIS["Northing",NORTH],AUTHORITY["EPSG","32718"]]</OGC_WKT>
+    <PROJ4>+proj=utm +zone=18 +south +datum=WGS84 +units=m +no_defs</PROJ4>
+    <EPSG>32718</EPSG>
+  </PROJECTION>
+</SAGA_METADATA>
